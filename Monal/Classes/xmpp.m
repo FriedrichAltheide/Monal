@@ -169,10 +169,10 @@ NSString *const kXMPPPresence = @"presence";
     self.sendQueue.qualityOfService=NSQualityOfServiceUtility;
     self.sendQueue.maxConcurrentOperationCount=1;
     
-    if(_outputBuffer)
-		free(_outputBuffer);
-    _outputBuffer = nil;
-    _outputBufferByteCount = 0;
+    if(self->_outputBuffer)
+        free(self->_outputBuffer);
+    self->_outputBuffer = nil;
+    self->_outputBufferByteCount = 0;
     
     //placing more common at top to reduce iteration
     _stanzaTypes=[NSArray arrayWithObjects:
@@ -389,11 +389,11 @@ NSString *const kXMPPPresence = @"presence";
     DDLogInfo(@"XMPP connnect  start");
     [self.sendQueue cancelAllOperations];
 	[self.sendQueue addOperationWithBlock:^{
-		_outputQueue=[[NSMutableArray alloc] init];
-		if(_outputBuffer)
-			free(_outputBuffer);
-		_outputBuffer = nil;
-		_outputBufferByteCount = 0;
+        self->_outputQueue=[[NSMutableArray alloc] init];
+        if(self->_outputBuffer)
+			free(self->_outputBuffer);
+		self->_outputBuffer = nil;
+		self->_outputBufferByteCount = 0;
 	}];
     
     //read persisted state
@@ -465,9 +465,9 @@ NSString *const kXMPPPresence = @"presence";
 	[self.sendQueue cancelAllOperations];
 	[self.sendQueue addOperationWithBlock:^{
 		self->_outputQueue=[[NSMutableArray alloc] init];
-		if(_outputBuffer)
-			free(_outputBuffer);
-		_outputBuffer = nil;
+        if(self->_outputBuffer)
+			free(self->_outputBuffer);
+		self->_outputBuffer = nil;
 		self->_outputBufferByteCount = 0;
 	}];
     [self.receiveQueue cancelAllOperations];
@@ -568,7 +568,7 @@ NSString *const kXMPPPresence = @"presence";
     {
 		[self.sendQueue cancelAllOperations];
 		[self.sendQueue addOperations: @[[NSBlockOperation blockOperationWithBlock:^{
-			if(_accountState>=kStateBound)
+			if(self->_accountState>=kStateBound)
 			{
 				//disable push for this node
 				if(self.pushNode && [self.pushNode length]>0 && self.connectionProperties.supportsPush)
@@ -795,7 +795,7 @@ NSString *const kXMPPPresence = @"presence";
         if(self.pingID)
         {
             DDLogVerbose(@"ping timed out without a reply to %@",self.pingID);
-            _accountState=kStateReconnecting;
+            self->_accountState=kStateReconnecting;
             [self reconnect];
         }
         else
