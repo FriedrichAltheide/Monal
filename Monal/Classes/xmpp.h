@@ -118,16 +118,16 @@ extern NSString *const _Nonnull kXMPPSuccess;
 extern NSString *const _Nonnull kXMPPPresence;
 
 
--(id) initWithServer:(nonnull MLXMPPServer *) server andIdentity:(nonnull MLXMPPIdentity *)identity;
+-(id _Nonnull) initWithServer:(MLXMPPServer * _Nonnull) server andIdentity:(MLXMPPIdentity * _Nonnull)identity;
 
--(void) connectWithCompletion:(xmppCompletion) completion;
+-(void) connectWithCompletion:(xmppCompletion _Nullable) completion;
 -(void) connect;
 -(void) disconnect;
 
 /**
  send a message to a contact with xmpp id
  */
--(void) sendMessage:(NSString*) message toContact:(NSString*) contact isMUC:(BOOL) isMUC isEncrypted:(BOOL) encrypt isUpload:(BOOL) isUpload andMessageId:(NSString *) messageId ;
+-(void) sendMessage:(NSString* _Nonnull) message toContact:(NSString* _Nonnull) contact isMUC:(BOOL) isMUC isEncrypted:(BOOL) encrypt isUpload:(BOOL) isUpload andMessageId:(NSString * _Nonnull) messageId ;
 
 /**
  crafts a whitepace ping and sends it
@@ -182,7 +182,7 @@ extern NSString *const _Nonnull kXMPPPresence;
 /**
 sets the status message. makes xmpp call
  */
--(void) setStatusMessageText:(NSString *) message;
+-(void) setStatusMessageText:(NSString * _Nullable) message;
 
 /**
 sets away xmpp call.
@@ -212,34 +212,34 @@ sets away xmpp call.
 /**
  join a room on the conference server
  */
--(void) joinRoom:(NSString*) room withNick:(NSString*) nick andPassword:(NSString *)password;
+-(void) joinRoom:(NSString* _Nonnull) room withNick:(NSString* _Nonnull) nick andPassword:(NSString * _Nullable)password;
 
 /**
  leave specific room. the nick name is the name used in the room.
  it is arbitrary and it may not match any other hame.
  */
--(void) leaveRoom:(NSString*) room withNick:(NSString *) nick;
+-(void) leaveRoom:(NSString* _Nonnull) room withNick:(NSString * _Nullable) nick;
 
 #pragma mark Jingle
 /**
  Calls a contact
  */
--(void)call:(MLContact*) contact;
+-(void)call:(MLContact* _Nonnull) contact;
 
 /**
 Hangs up current call with contact
  */
--(void)hangup:(MLContact*) contact;
+-(void)hangup:(MLContact* _Nonnull) contact;
 
 /**
 Decline a call request
  */
--(void)declineCall:(NSDictionary*) contact;
+-(void)declineCall:(NSDictionary* _Nonnull) contact;
 
 /**
  accept call request
  */
--(void)acceptCall:(NSDictionary*) contact;
+-(void)acceptCall:(NSDictionary* _Nonnull) contact;
 
 
 /*
@@ -259,16 +259,16 @@ Decline a call request
  -(void) requestHTTPSlotWithParams:(NSDictionary *)params andCompletion:(void(^)(NSString *url,  NSError *error)) completion;
 
 
--(void) setMAMQueryMostRecentForJid:(NSString *)jid;
+-(void) setMAMQueryMostRecentForJid:(NSString * _Nonnull)jid;
 
 /*
  query message archive.
  */
--(void) setMAMQueryFromStart:(NSDate *) startDate after:(NSString *) after  andJid:(NSString *)jid;
+-(void) setMAMQueryFromStart:(NSDate * _Nonnull) startDate after:(NSString * _Nullable) after  andJid:(NSString * _Nullable)jid;
 
 
 //-(void) queryMAMSinceLastStanzaForContact:(NSString *) contactJid;
--(void) queryMAMSinceLastMessageDateForContact:(NSString *) contactJid; 
+-(void) queryMAMSinceLastMessageDateForContact:(NSString * _Nonnull) contactJid;
 
 -(void) setMAMPrefs:(NSString *) preference;
 -(void) getMAMPrefs;
@@ -281,13 +281,13 @@ Decline a call request
 /**
  query a user's vcard
  */
--(void) getVCard:(NSString *) user;
+-(void) getVCard:(NSString * _Nonnull) user;
 
 #ifndef DISABLE_OMEMO
 
--(void) subscribeOMEMODevicesFrom:(NSString *) jid;
+-(void) subscribeOMEMODevicesFrom:(NSString * _Nonnull) jid;
 /** OMEMO */
--(void) queryOMEMODevicesFrom:(NSString *) jid;
+-(void) queryOMEMODevicesFrom:(NSString * _Nonnull) jid;
 #endif
 
 /**
@@ -300,8 +300,8 @@ Decline a call request
 
 #pragma mark - account management
 
--(void) changePassword:(NSString *) newPass withCompletion:(xmppCompletion) completion;
+-(void) changePassword:(NSString * _Nonnull) newPass withCompletion:(xmppCompletion) completion;
 
--(void) registerUser:(NSString *) username withPassword:(NSString *) password captcha:(NSString *) captcha andHiddenFields:(NSDictionary *)hiddenFields withCompletion:(xmppCompletion) completion;
+-(void) registerUser:(NSString * _Nonnull) username withPassword:(NSString * _Nonnull) password captcha:(NSString *) captcha andHiddenFields:(NSDictionary *)hiddenFields withCompletion:(xmppCompletion) completion;
 
 @end

@@ -86,7 +86,7 @@
 
 #pragma mark MUC 
 
--(void) joinRoom:(NSString*) room withPassword:(NSString*) password onServer:(NSString*) server withName:(NSString*)name
+-(void) joinRoom:(NSString* _Nonnull) room withPassword:(NSString* _Nullable) password onServer:(NSString* _Nonnull) server withName:(NSString*)name
 {
     [self.attributes setObject:[NSString stringWithFormat:@"%@@%@/%@", room,server,name] forKey:@"to"];
     
