@@ -8,13 +8,13 @@
 
 #import <Foundation/Foundation.h>
 
-FOUNDATION_EXPORT NSString *const kSubBoth;
-FOUNDATION_EXPORT NSString *const kSubNone;
-FOUNDATION_EXPORT NSString *const kSubTo;
-FOUNDATION_EXPORT NSString *const kSubFrom;
-FOUNDATION_EXPORT NSString *const kSubRemove;
+FOUNDATION_EXPORT NSString *const _Nonnull kSubBoth;
+FOUNDATION_EXPORT NSString *const _Nonnull kSubNone;
+FOUNDATION_EXPORT NSString *const _Nonnull kSubTo;
+FOUNDATION_EXPORT NSString *const _Nonnull kSubFrom;
+FOUNDATION_EXPORT NSString *const _Nonnull kSubRemove;
 
-FOUNDATION_EXPORT NSString *const kAskSubscribe;
+FOUNDATION_EXPORT NSString *const _Nonnull kAskSubscribe;
 
 NS_ASSUME_NONNULL_BEGIN
 

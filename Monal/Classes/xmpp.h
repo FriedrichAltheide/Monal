@@ -41,11 +41,11 @@ typedef NS_ENUM (NSInteger, xmppRegistrationState) {
     kStateRegistered
 };
 
-FOUNDATION_EXPORT NSString *const kFileName;
-FOUNDATION_EXPORT NSString *const kContentType;
-FOUNDATION_EXPORT NSString *const kData;
-FOUNDATION_EXPORT NSString *const kContact;
-FOUNDATION_EXPORT NSString *const kCompletion;
+FOUNDATION_EXPORT NSString *const _Nonnull kFileName;
+FOUNDATION_EXPORT NSString *const _Nonnull kContentType;
+FOUNDATION_EXPORT NSString *const _Nonnull kData;
+FOUNDATION_EXPORT NSString *const _Nonnull kContact;
+FOUNDATION_EXPORT NSString *const _Nonnull kCompletion;
 
 typedef void (^xmppCompletion)(BOOL success, NSString *message);
 typedef void (^xmppDataCompletion)(NSData *captchaImage, NSDictionary *hiddenFields);
@@ -110,12 +110,12 @@ typedef void (^xmppDataCompletion)(NSData *captchaImage, NSDictionary *hiddenFie
 @property (nonatomic, strong) MLSignalStore *monalSignalStore;
 #endif
 
-extern NSString *const kMessageId;
-extern NSString *const kSendTimer;
+extern NSString *const _Nonnull kMessageId;
+extern NSString *const _Nonnull kSendTimer;
 
-extern NSString *const kXMPPError;
-extern NSString *const kXMPPSuccess;
-extern NSString *const kXMPPPresence;
+extern NSString *const _Nonnull kXMPPError;
+extern NSString *const _Nonnull kXMPPSuccess;
+extern NSString *const _Nonnull kXMPPPresence;
 
 
 -(id) initWithServer:(nonnull MLXMPPServer *) server andIdentity:(nonnull MLXMPPIdentity *)identity;
