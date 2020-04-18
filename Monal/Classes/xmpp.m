@@ -369,7 +369,7 @@ NSString *const kXMPPPresence = @"presence";
 		_discoveredServersList=[[[MLDNSLookup alloc] init] dnsDiscoverOnDomain:self.connectionProperties.identity.domain];
     }
     
-    //if all servers have been tried start over with the first one again
+    // if all servers have been tried start over with the first one again
     if([_discoveredServersList count]>0 && [_usableServersList count]==0)
 	{
 		DDLogWarn(@"All %lu SRV dns records tried, starting over again", (unsigned long)[_discoveredServersList count]);
@@ -383,7 +383,12 @@ NSString *const kXMPPPresence = @"presence";
 				[row objectForKey:@"priority"]
 			);
 		}
-	}
+    } else if([_discoveredServersList count] == 0 && [_usableServersList count] == 0) {
+        DDLogInfo(@"No SRV entry found for domain %@", self.connectionProperties.identity.domain);
+        NSString *message = @"No SRV entry found.";
+        [[NSNotificationCenter defaultCenter] postNotificationName:kXMPPError object:@[self, message]];
+        return;
+    }
 	
     if([_usableServersList count]>0) {
 		DDLogInfo(@"Using connection parameters discovered via SRV dns record: server=%@, port=%@, isSecure=%s, priority=%@",
