@@ -368,6 +368,13 @@ NSString *const kXMPPPresence = @"presence";
 	if([_discoveredServersList count]==0) {
 		_discoveredServersList=[[[MLDNSLookup alloc] init] dnsDiscoverOnDomain:self.connectionProperties.identity.domain];
     }
+
+    if([_discoveredServersList count] == 0) {
+        DDLogInfo(@"No SRV entry found for domain %@", self.connectionProperties.identity.domain);
+        NSString *message = @"No SRV entry found.";
+        [[NSNotificationCenter defaultCenter] postNotificationName:kXMPPError object:@[self, message]];
+        return;
+    }
     
     // if all servers have been tried start over with the first one again
     if([_discoveredServersList count]>0 && [_usableServersList count]==0)
@@ -383,11 +390,6 @@ NSString *const kXMPPPresence = @"presence";
 				[row objectForKey:@"priority"]
 			);
 		}
-    } else if([_discoveredServersList count] == 0 && [_usableServersList count] == 0) {
-        DDLogInfo(@"No SRV entry found for domain %@", self.connectionProperties.identity.domain);
-        NSString *message = @"No SRV entry found.";
-        [[NSNotificationCenter defaultCenter] postNotificationName:kXMPPError object:@[self, message]];
-        return;
     }
 	
     if([_usableServersList count]>0) {
@@ -412,9 +414,8 @@ NSString *const kXMPPPresence = @"presence";
 				[row objectForKey:@"priority"]
 			);
 		}
+        [self createStreams];
     }
-    
-    [self createStreams];
 }
 
 -(void) connectWithCompletion:(xmppCompletion) completion
