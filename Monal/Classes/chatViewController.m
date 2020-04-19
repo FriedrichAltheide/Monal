@@ -861,7 +861,7 @@
 //            }
         }
         
-        [[DataLayer sharedInstance] messageTypeForMessage: message.messageText withKeepThread:NO andCompletion:^(NSString *messageType) {
+        [[DataLayer sharedInstance] messageTypeForMessage: message.messageText withKeepThread:YES andCompletion:^(NSString *messageType) {
             
             dispatch_async(dispatch_get_main_queue(),
                            ^{
