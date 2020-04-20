@@ -369,11 +369,15 @@ NSString *const kXMPPPresence = @"presence";
 		_discoveredServersList=[[[MLDNSLookup alloc] init] dnsDiscoverOnDomain:self.connectionProperties.identity.domain];
     }
 
-    if([_discoveredServersList count] == 0) {
-        DDLogInfo(@"No SRV entry found for domain %@", self.connectionProperties.identity.domain);
-        NSString *message = @"No SRV entry found.";
-        [[NSNotificationCenter defaultCenter] postNotificationName:kXMPPError object:@[self, message]];
-        return;
+    // Show warning when xmpp-client srv entry prohibits connections
+    for(NSDictionary *row in _discoveredServersList) {
+        // Check if entry "." == srv target
+        if(![[row objectForKey:@"isEnabled"] boolValue]) {
+            NSString *message = @"SRV entry prohibits XMPP connection";
+            DDLogInfo(@"%@ for domain %@", message, self.connectionProperties.identity.domain);
+            [[NSNotificationCenter defaultCenter] postNotificationName:kXMPPError object:@[self, message]];
+            return;
+        }
     }
     
     // if all servers have been tried start over with the first one again
@@ -413,9 +417,9 @@ NSString *const kXMPPPresence = @"presence";
 				[[row objectForKey:@"isSecure"] boolValue] ? "YES" : "NO",
 				[row objectForKey:@"priority"]
 			);
-		}
-        [self createStreams];
+        }
     }
+    [self createStreams];
 }
 
 -(void) connectWithCompletion:(xmppCompletion) completion

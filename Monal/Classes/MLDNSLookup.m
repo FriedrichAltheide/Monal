@@ -157,7 +157,8 @@ void print_rdata(int type, int len, const u_char *rdata, void* context)
         NSNumber* thePort = [NSNumber numberWithInt:ntohs(srv->port)];
         if(theServer && prio && weight && thePort) {
             // Check if service is not provided
-            if([theServer isEqualToString:@"."]) {
+            bool serviceEnabled = ![theServer isEqualToString:@"."];
+            if(serviceEnabled == false && isSecure) {
                 return;
             }
             // Validate that the domain ends with at dot
@@ -166,7 +167,7 @@ void print_rdata(int type, int len, const u_char *rdata, void* context)
             }
             // TODO: Validate that the server fqdn format is correct
 
-            NSDictionary* row=[NSDictionary dictionaryWithObjectsAndKeys:prio,@"priority", theServer,@"server", thePort,@"port", [NSNumber numberWithBool:isSecure],@"isSecure", weight,@"weight", nil];
+            NSDictionary* row=[NSDictionary dictionaryWithObjectsAndKeys:prio,@"priority", theServer,@"server", thePort,@"port", [NSNumber numberWithBool:isSecure],@"isSecure", weight,@"weight", [NSNumber numberWithBool:serviceEnabled],@"isEnabled", nil];
             [caller.discoveredServers addObject:row];
         }
     }
