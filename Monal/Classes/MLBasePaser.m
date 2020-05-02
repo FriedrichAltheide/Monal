@@ -35,13 +35,13 @@
 - (void)parserDidStartDocument:(NSXMLParser *)parser{
     DDLogVerbose(@"Document start");
     self.currentStanzaParser=nil;
-     self.depth=0;
+    self.depth=0;
 }
 
 - (void)parser:(NSXMLParser *)parser didStartElement:(NSString *)elementName namespaceURI:(NSString *)namespaceURI qualifiedName:(NSString *)qName attributes:(NSDictionary *)attributeDict
 {
     self.depth++;
-    DDLogDebug(@"Started element :%@ with depth: %ld", elementName, self.depth);
+    DDLogDebug(@"Started element: %@ with depth: %ld", elementName, self.depth);
     
     //look at the element not the name space
     NSString *nameSpace;
