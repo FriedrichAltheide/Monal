@@ -11,6 +11,7 @@
 #import <Security/SecureTransport.h>
 
 #import "xmpp.h"
+#import "MLPipe.h"
 #import "DataLayer.h"
 #import "EncodingTools.h"
 #import "MLXMPPManager.h"
@@ -34,11 +35,8 @@
 #import "MLHTTPRequest.h"
 #import "AESGcm.h"
 
-#define kXMPPReadSize 5120 // bytes
-
 #define kConnectTimeout 20ull //seconds
 #define kPingTimeout 120ull //seconds
-
 
 
 NSString *const kMessageId=@"MessageID";
@@ -65,8 +63,8 @@ NSString *const kXMPPPresence = @"presence";
 
 @interface xmpp()
 {
-    NSInputStream *_iStream;
-    NSOutputStream *_oStream;
+    MLPipe* _iPipe;
+    NSOutputStream* _oStream;
     NSMutableData* _inputDataBuffer;
     NSMutableArray* _outputQueue;
     // 64KiB buffer for stanzas we can not (completely) write to the tcp socket
@@ -224,9 +222,6 @@ NSString *const kXMPPPresence = @"presence";
 {
     [_oStream setDelegate:self];
     [_oStream scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
-
-    [_iStream setDelegate:self];
-    [_iStream scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
 }
 
 -(void) initTLS
@@ -241,18 +236,18 @@ NSString *const kXMPPPresence = @"presence";
 
 	//this will create an sslContext and, if the underlying TCP socket is already connected, immediately start the ssl handshake
 	DDLogInfo(@"configuring SSL handshake");
-	if(CFReadStreamSetProperty((__bridge CFReadStreamRef)self->_iStream, kCFStreamPropertySSLSettings, (__bridge CFTypeRef)settings))
-		DDLogInfo(@"Set TLS properties on streams. Security level %@", [self->_iStream propertyForKey:NSStreamSocketSecurityLevelKey]);
+	if(CFReadStreamSetProperty((__bridge CFReadStreamRef)self->_oStream, kCFStreamPropertySSLSettings, (__bridge CFTypeRef)settings))
+		DDLogInfo(@"Set TLS properties on streams. Security level %@", [self->_oStream propertyForKey:NSStreamSocketSecurityLevelKey]);
 	else
 	{
 		DDLogError(@"not sure.. Could not confirm Set TLS properties on streams.");
-		DDLogInfo(@"Set TLS properties on streams.security level %@", [self->_iStream propertyForKey:NSStreamSocketSecurityLevelKey]);
+		DDLogInfo(@"Set TLS properties on streams.security level %@", [self->_oStream propertyForKey:NSStreamSocketSecurityLevelKey]);
 	}
 
 	//see this for extracting the sslcontext of the cfstream: https://stackoverflow.com/a/26726525/3528174
 	//see this for creating the proper protocols array: https://github.com/LLNL/FRS/blob/master/Pods/AWSIoT/AWSIoT/Internal/AWSIoTMQTTClient.m
 	//this will only have an effect if the TLS handshake was not already started (e.g. the TCP socket is not connected)
-	SSLContextRef sslContext = (__bridge SSLContextRef) [_iStream propertyForKey: (__bridge NSString *) kCFStreamPropertySSLContext ];
+	SSLContextRef sslContext = (__bridge SSLContextRef) [_oStream propertyForKey: (__bridge NSString *) kCFStreamPropertySSLContext ];
 	CFStringRef strs[1];
 	strs[0] = CFSTR("xmpp-client");
 	CFArrayRef protocols = CFArrayCreate(NULL, (void *)strs, 1, &kCFTypeArrayCallBacks);
@@ -269,16 +264,11 @@ NSString *const kXMPPPresence = @"presence";
 
     [NSStream getStreamsToHostWithName:self.connectionProperties.server.connectServer port:self.connectionProperties.server.connectPort.integerValue inputStream:&localIStream outputStream:&localOStream];
 
-    if(localIStream) {
-        _iStream=localIStream;
-    }
-
     if(localOStream) {
         _oStream = localOStream;
     }
-
-
-    if((_iStream==nil) || (_oStream==nil))
+    
+    if((localIStream==nil) || (localOStream==nil))
     {
         DDLogError(@"Connection failed");
         NSString *message=@"Unable to connect to server";
@@ -287,16 +277,19 @@ NSString *const kXMPPPresence = @"presence";
             self.loginCompletion(NO, message);
             self.loginCompletion=nil;
         }
-
         return;
     }
     else {
         DDLogInfo(@"streams created ok");
     }
-
+    
+    if(localIStream) {
+        _iPipe = [[MLPipe alloc] initWithInputStream:localIStream andOuterDelegate:self];
+    }
+    
     if(self.connectionProperties.server.isDirectTLS==YES)
     {
-		DDLogInfo(@"starting directSSL");
+        DDLogInfo(@"starting directSSL");
         [self initTLS];
     }
 
@@ -326,7 +319,7 @@ NSString *const kXMPPPresence = @"presence";
 
     dispatch_resume(streamTimer);
 
-    [_iStream open];
+    [localIStream open];
     [_oStream open];
 
     dispatch_source_cancel(streamTimer);
@@ -530,26 +523,14 @@ NSString *const kXMPPPresence = @"presence";
         DDLogInfo(@"removing streams");
 
         //prevent any new read or write
-        [self->_iStream setDelegate:nil];
+        [self->_iPipe close];
+        self->_iPipe = nil;
         [self->_oStream setDelegate:nil];
 
         [self->_oStream removeFromRunLoop:[NSRunLoop mainRunLoop]
                                   forMode:NSDefaultRunLoopMode];
 
-        [self->_iStream removeFromRunLoop:[NSRunLoop mainRunLoop]
-                                  forMode:NSDefaultRunLoopMode];
         DDLogInfo(@"removed streams");
-
-        self->_inputDataBuffer=[[NSMutableData alloc] init];
-
-        @try
-        {
-            [self->_iStream close];
-        }
-        @catch(id theException)
-        {
-            DDLogError(@"Exception in istream close");
-        }
 
         @try
         {
@@ -560,7 +541,6 @@ NSString *const kXMPPPresence = @"presence";
             DDLogError(@"Exception in ostream close");
         }
 
-        self->_iStream=nil;
         self->_oStream=nil;
     }];
 }
@@ -784,7 +764,9 @@ NSString *const kXMPPPresence = @"presence";
 
     if(!self.baseParserDelegate) {
         self.baseParserDelegate = [[MLBasePaser alloc] initWithCompeltion:^(XMPPParser * _Nullable parsedStanza) {
-            [self processInput:parsedStanza];
+            [self.receiveQueue addOperationWithBlock:^{
+                [self processInput:parsedStanza];           // always process stanzas in the receiveQueue
+            }];
         }];
     } else {
         if(self.xmlParser!=nil)
@@ -792,24 +774,23 @@ NSString *const kXMPPPresence = @"presence";
             DDLogInfo(@"resetting old xml parser");
             [self.xmlParser abortParsing];
         }
-        DDLogInfo(@"resetting old parser delegated");
+        DDLogInfo(@"resetting old parser delegate");
         [self.baseParserDelegate reset];
     }
     
-    // create (new) streaming parser
-    if(self.xmlParser==nil)
-        self.xmlParser = [NSXMLParser alloc];
-    self.xmlParser = [self.xmlParser initWithStream:_iStream];
+    // create (new) pipe and attach a (new) streaming parser
+    self.xmlParser = [[NSXMLParser alloc] initWithStream:[_iPipe getNewEnd]];
     [self.xmlParser setShouldProcessNamespaces:NO];
     [self.xmlParser setShouldReportNamespacePrefixes:NO];
     [self.xmlParser setShouldResolveExternalEntities:NO];
     [self.xmlParser setDelegate:self.baseParserDelegate];
     
-    [self.receiveQueue addOperationWithBlock: ^{
-        DDLogInfo(@"calling parse from receiveQueue (after parser create)");
+    // do the stanza parsing in the default global queue
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        DDLogInfo(@"calling parse");
         [self.xmlParser parse]; //blocking operation
-        DDLogInfo(@"parsing ended (after parser create)");
-    }];
+        DDLogInfo(@"parse ended");
+    });
 
     MLXMLNode* stream = [[MLXMLNode alloc] init];
     stream.element=@"stream:stream";
@@ -1059,53 +1040,6 @@ NSString *const kXMPPPresence = @"presence";
 
 
 #pragma mark - stanza handling
-
--(void) processXMLDoc {
-    if(_inputDataBuffer.length>0) {
-
-        #ifdef DEBUG
-                NSString *dataString = [[NSString alloc] initWithBytes:_inputDataBuffer.bytes length:_inputDataBuffer.length encoding:NSUTF8StringEncoding];
-                DDLogVerbose(@"RECV: %@", dataString);
-        #endif
-        
-        //sanity check
-        char* lastByte = malloc(1);
-        [_inputDataBuffer getBytes:lastByte range:NSMakeRange(_inputDataBuffer.length-1, 1)];
-        if(lastByte[0] !='>') {
-              free(lastByte);
-            DDLogInfo(@"Incomplete stanza getting more");
-            return;
-        }
-        
-        free(lastByte);
-        
-
-        
-        if(self->_accountState>=kStateBinding || self.resuming) {
-            //we append these strings so that the parser sees a valid XML doc
-            [_inputDataBuffer appendData:self.containerSuffix];
-        }
-        else  {
-            DDLogVerbose(@"State: %ld resuming %d", (long)self->_accountState, self.resuming);
-        }
-        
-        [self.baseParserDelegate reset];
-        NSXMLParser *xmlParser = [[NSXMLParser alloc] initWithData:_inputDataBuffer];
-        [xmlParser setShouldProcessNamespaces:NO];
-        [xmlParser setShouldReportNamespacePrefixes:NO];
-        [xmlParser setShouldResolveExternalEntities:NO];
-        [xmlParser setDelegate:self.baseParserDelegate];
-        self.xmlParser=xmlParser;
-        
-        [self.xmlParser parse];
-        _inputDataBuffer = [[NSMutableData alloc] init];
-        if(self->_accountState>=kStateBinding || self.resuming) {
-            [_inputDataBuffer appendData:self.containerPrefix];
-        }
-    } else  {
-        DDLogError(@"No Doc to process");
-    }
-}
 
 -(void) processInput:(XMPPParser *) parsedStanza
 {
@@ -1691,8 +1625,9 @@ NSString *const kXMPPPresence = @"presence";
         {
             if(streamNode.startTLSProceed)
             {
+                [_iPipe drainInputStream];
                 [self initTLS];
-                 self->_startTLSComplete=YES;
+                self->_startTLSComplete=YES;
                 [self startStream];
             }
         }
@@ -1845,27 +1780,13 @@ NSString *const kXMPPPresence = @"presence";
                 srand([[NSDate date] timeIntervalSince1970]);
                 self->_accountState=kStateLoggedIn;
 
-//                NSXMLParser *xmlParser = [[NSXMLParser alloc] initWithStream:_iStream];
-//                [xmlParser setShouldProcessNamespaces:NO];
-//                [xmlParser setShouldReportNamespacePrefixes:NO];
-//                [xmlParser setShouldResolveExternalEntities:NO];
-//                [self.baseParserDelegate reset];
-//                [xmlParser setDelegate:self.baseParserDelegate];
-//                self.xmlParser=xmlParser;
-
-
                 self.connectedTime=[NSDate date];
                 self->_loggedInOnce=YES;
                 self->_loginStarted=NO;
                 self.loginStartTimeStamp=nil;
-
-//                 [self.receiveQueue addOperationWithBlock: ^{
-//                     [self.xmlParser parse];//blocking operation
-//                 }];
                 
-                     [self startStream];
-                 [_inputDataBuffer appendData:self.containerPrefix];
-                        
+                [_iPipe drainInputStream];
+                [self startStream];
             }
         }
     }
@@ -3051,14 +2972,14 @@ static NSMutableArray *extracted(xmpp *object) {
 {
     DDLogVerbose(@"Stream has event");
 
-    if(stream!=_iStream && stream!=_oStream)
-    {
-        DDLogVerbose(@"event from stale stream. This should not happen. Cleaning up and reconnecting.");
-        [self disconnectWithCompletion:^{
-            [self reconnect];
-        }];
-        return;
-    }
+//     if(stream!=_iStream && stream!=_oStream)
+//     {
+//         DDLogVerbose(@"event from stale stream. This should not happen. Cleaning up and reconnecting.");
+//         [self disconnectWithCompletion:^{
+//             [self reconnect];
+//         }];
+//         return;
+//     }
 
     switch(eventCode)
     {
@@ -3067,7 +2988,7 @@ static NSMutableArray *extracted(xmpp *object) {
             DDLogVerbose(@"Stream open completed");
 
         }
-            //for writing
+        //for writing
         case NSStreamEventHasSpaceAvailable:
         {
             [self.sendQueue addOperationWithBlock: ^{
@@ -3079,24 +3000,10 @@ static NSMutableArray *extracted(xmpp *object) {
             break;
         }
 
-            //for reading
+        //for reading
         case  NSStreamEventHasBytesAvailable:
         {
-            DDLogVerbose(@"Stream has bytes to read");
-            [self.receiveQueue addOperationWithBlock: ^{
-                DDLogInfo(@"calling parse from receiveQueue (stream has bytes to read)");
-                [self.xmlParser parse];
-                DDLogInfo(@"parsing ended (stream has bytes to read)");
-            }];
-// //            if(self->_accountState>=kStateLoggedIn)
-// //            { [self.receiveQueue addOperationWithBlock: ^{
-// //                [self.xmlParser parse];}];
-// //            }
-// //            else  {
-//                 [self.receiveQueue addOperationWithBlock: ^{
-//                     [self readToBuffer];
-//                 }];
-//            // }
+            DDLogError(@"Stream has bytes to read (should not be called!)");
             break;
         }
 
@@ -3106,10 +3013,6 @@ static NSMutableArray *extracted(xmpp *object) {
             DDLogError(@"Stream error code=%ld domain=%@   local desc:%@ ",(long)st_error.code,st_error.domain,  st_error.localizedDescription);
 
             NSString *message =st_error.localizedDescription;
-
-            //            SecTrustRef trust = (__bridge SecTrustRef)[_iStream propertyForKey:kCFStreamPropertySSLPeerTrust];
-            //
-            //            SecCertificateRef cert=SecTrustGetCertificateAtIndex( trust,  0);
 
             switch(st_error.code)
             {
@@ -3229,9 +3132,6 @@ static NSMutableArray *extracted(xmpp *object) {
         }
         case NSStreamEventNone:
         {
-//             [self.receiveQueue addOperationWithBlock: ^{
-//                 [self readToBuffer];
-//             }];
             DDLogVerbose(@"Stream event none");
             break;
 
@@ -3380,7 +3280,7 @@ static NSMutableArray *extracted(xmpp *object) {
 		if(sentLen!=rawstringLen)
 		{
 			//allocate new _outputBuffer
-			_outputBuffer=malloc(sizeof(uint8_t) * rawstringLen-sentLen);
+			_outputBuffer=malloc(sizeof(uint8_t) * (rawstringLen-sentLen));
 			//copy the remaining data into the buffer and set the buffer pointer accordingly
 			memcpy(_outputBuffer, rawstring+(size_t)sentLen, (size_t)(rawstringLen-sentLen));
 			_outputBufferByteCount=(size_t)(rawstringLen-sentLen);
@@ -3397,32 +3297,6 @@ static NSMutableArray *extracted(xmpp *object) {
         return NO;
     }
 }
-
--(void) readToBuffer
-{
-	if(![_iStream hasBytesAvailable])
-	{
-		DDLogVerbose(@"no bytes  to read");
-        [self processXMLDoc];
-		return;
-	}
-	uint8_t* buf=malloc(kXMPPReadSize);
-    NSInteger len = 0;
-	do
-	{
-		len = [_iStream read:buf maxLength:kXMPPReadSize];
-		DDLogVerbose(@"done reading %ld", (long)len);
-		if(len>0) {
-			[self->_inputDataBuffer appendBytes:(const void *)buf length:len];
-			//  DDLogVerbose(@" got raw string %s ", buf);
-        }
-    } while(len>0 && [_iStream hasBytesAvailable]);
-    free(buf);
-    [self processXMLDoc];
-
-	return;
-}
-
 
 -(void) enablePush
 {

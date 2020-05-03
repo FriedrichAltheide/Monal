@@ -165,7 +165,7 @@
 
 - (void)parser:(NSXMLParser *)parser parseErrorOccurred:(NSError *)parseError
 {
-    DDLogError(@"Error: line: %ld , col: %ld desc: %@ ",(long)[parser lineNumber],
+    DDLogError(@"parseErrorOccurred: line: %ld , col: %ld desc: %@ ",(long)[parser lineNumber],
                (long)[parser columnNumber], [parseError localizedDescription]);
 }
 
