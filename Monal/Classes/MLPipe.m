@@ -31,6 +31,7 @@
     _outputBufferByteCount = 0;
     [_input setDelegate:self];
     [_input scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+    return self;
 }
 
 -(void)dealloc
@@ -132,32 +133,32 @@
     //try to send remaining buffered data first
     if(_outputBufferByteCount>0)
     {
-		NSInteger writtenLen=[_output write:_outputBuffer maxLength:_outputBufferByteCount];
-		if(writtenLen!=-1)
-		{
-			if(writtenLen!=_outputBufferByteCount)		//some bytes remaining to send
-			{
-				memmove(_outputBuffer, _outputBuffer+(size_t)writtenLen, _outputBufferByteCount-(size_t)writtenLen);
-				_outputBufferByteCount-=writtenLen;
+        NSInteger writtenLen=[_output write:_outputBuffer maxLength:_outputBufferByteCount];
+        if(writtenLen!=-1)
+        {
+            if(writtenLen!=_outputBufferByteCount)        //some bytes remaining to send
+            {
+                memmove(_outputBuffer, _outputBuffer+(size_t)writtenLen, _outputBufferByteCount-(size_t)writtenLen);
+                _outputBufferByteCount-=writtenLen;
                 DDLogVerbose(@"pipe processing sent part of buffered data");
                 return;
-			}
-			else
-			{
-				//dealloc empty buffer
-				free(_outputBuffer);
-				_outputBuffer=nil;
-				_outputBufferByteCount=0;		//everything sent
-				DDLogVerbose(@"pipe processing sent all buffered data");
-			}
-		}
-		else
-		{
-			NSError* error=[_output streamError];
-			DDLogError(@"pipe sending failed with error %ld domain %@ message %@", (long)error.code, error.domain, error.userInfo);
-			return;
-		}
-	}
+            }
+            else
+            {
+                //dealloc empty buffer
+                free(_outputBuffer);
+                _outputBuffer=nil;
+                _outputBufferByteCount=0;        //everything sent
+                DDLogVerbose(@"pipe processing sent all buffered data");
+            }
+        }
+        else
+        {
+            NSError* error=[_output streamError];
+            DDLogError(@"pipe sending failed with error %ld domain %@ message %@", (long)error.code, error.domain, error.userInfo);
+            return;
+        }
+    }
     
     //return here if we have nothing to read
     if(![_input hasBytesAvailable])
