@@ -2326,7 +2326,7 @@ NSString *const kCount = @"count";
     // checking db version and upgrading if necessary
     DDLogVerbose(@"Database version check");
 
-    //<1.02 has no db version table but gtalk port is 443 . this is an identifier
+    // <1.02 has no db version table but gtalk port is 443 . this is an identifier
     NSNumber* gtalkport = (NSNumber*)[self executeScalar:@"select default_port from  protocol   where protocol_name='GTalk';" andArguments:nil];
     if([gtalkport intValue] == 443)
     {
