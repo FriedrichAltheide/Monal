@@ -29,7 +29,6 @@ NSString *const kPort = @"other_port";
 NSString *const kResource = @"resource";
 NSString *const kSSL = @"secure";
 NSString *const kOldSSL = @"oldstyleSSL";
-NSString *const kOauth = @"oauth";
 NSString *const kSelfSigned = @"selfsigned";
 NSString *const kAirdrop = @"airdrop";
 
@@ -769,7 +768,7 @@ NSString *const kCount = @"count";
 
 -(void) addAccountWithDictionary:(NSDictionary*) dictionary andCompletion: (void (^)(BOOL))completion
 {
-    NSString* query = [NSString stringWithFormat:@"insert into account (server, other_port, secure, resource, domain, enabled, selfsigned, oldstyleSSL, oauth, username, airdrop) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"];
+    NSString* query = [NSString stringWithFormat:@"insert into account (server, other_port, secure, resource, domain, enabled, selfsigned, oldstyleSSL, username, airdrop) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"];
     
     NSString* server = (NSString*) [dictionary objectForKey:kServer];
     NSString* port = (NSString*)[dictionary objectForKey:kPort];
@@ -781,7 +780,6 @@ NSString *const kCount = @"count";
                        [dictionary objectForKey:kEnabled] ,
                        [dictionary objectForKey:kSelfSigned],
                        [dictionary objectForKey:kOldSSL],
-                       [dictionary objectForKey:kOauth],
                        ((NSString *)[dictionary objectForKey:kUsername]),
                        [dictionary objectForKey:kAirdrop]?[dictionary objectForKey:kAirdrop]:@"0"
     ];
@@ -2791,11 +2789,11 @@ NSString *const kCount = @"count";
     if([dbversion doubleValue] < 4.72)
     {
         DDLogVerbose(@"Database version <4.72 detected. Performing upgrade on accounts.");
-        // Delete column protocol_id from account and drop protocol table
+        // Delete column protocol_id, oauth from account and drop protocol table
         [self executeNonQuery:@"PRAGMA foreign_keys=off;" andArguments:nil];
         [self executeNonQuery:@"ALTER TABLE account RENAME TO _accountTMP;" andArguments:nil];
-        [self executeNonQuery:@"CREATE TABLE 'account' ('account_id' integer NOT NULL PRIMARY KEY AUTOINCREMENT, 'server' varchar(1023) NOT NULL, 'other_port' integer, 'username' varchar(1023) NOT NULL, 'secure' bool, 'resource'  varchar(1023) NOT NULL, 'domain' varchar(1023) NOT NULL, 'enabled' bool, 'selfsigned' bool, 'oldstyleSSL' bool, 'oauth' bool, 'airdrop' bool, 'rosterVersion' varchar(50) DEFAULT 0, 'state' blob);" andArguments:nil];
-        [self executeNonQuery:@"INSERT INTO account (account_id, server, other_port, username, secure, resource, domain, enabled, selfsigned, oldstyleSSL, oauth, airdrop, rosterVersion, state) SELECT account_id, server, other_port, username, secure, resource, domain, enabled, selfsigned, oldstyleSSL, oauth, airdrop, rosterVersion, state from _accountTMP;" andArguments:nil];
+        [self executeNonQuery:@"CREATE TABLE 'account' ('account_id' integer NOT NULL PRIMARY KEY AUTOINCREMENT, 'server' varchar(1023) NOT NULL, 'other_port' integer, 'username' varchar(1023) NOT NULL, 'secure' bool, 'resource'  varchar(1023) NOT NULL, 'domain' varchar(1023) NOT NULL, 'enabled' bool, 'selfsigned' bool, 'oldstyleSSL' bool, 'airdrop' bool, 'rosterVersion' varchar(50) DEFAULT 0, 'state' blob);" andArguments:nil];
+        [self executeNonQuery:@"INSERT INTO account (account_id, server, other_port, username, secure, resource, domain, enabled, selfsigned, oldstyleSSL, airdrop, rosterVersion, state) SELECT account_id, server, other_port, username, secure, resource, domain, enabled, selfsigned, oldstyleSSL, airdrop, rosterVersion, state from _accountTMP;" andArguments:nil];
         [self executeNonQuery:@"UPDATE account SET rosterVersion='0' WHERE rosterVersion is NULL;" andArguments:nil];
         [self executeNonQuery:@"DROP TABLE _accountTMP;" andArguments:nil];
         [self executeNonQuery:@"PRAGMA foreign_keys=on;" andArguments:nil];
