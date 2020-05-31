@@ -2789,7 +2789,7 @@ NSString *const kCount = @"count";
     if([dbversion doubleValue] < 4.72)
     {
         DDLogVerbose(@"Database version <4.72 detected. Performing upgrade on accounts.");
-        // Delete column protocol_id from account and drop protocol table
+        // Delete column protocol_id, oauth from account and drop protocol table
         [self executeNonQuery:@"PRAGMA foreign_keys=off;" andArguments:nil];
         [self executeNonQuery:@"ALTER TABLE account RENAME TO _accountTMP;" andArguments:nil];
         [self executeNonQuery:@"CREATE TABLE 'account' ('account_id' integer NOT NULL PRIMARY KEY AUTOINCREMENT, 'server' varchar(1023) NOT NULL, 'other_port' integer, 'username' varchar(1023) NOT NULL, 'secure' bool, 'resource'  varchar(1023) NOT NULL, 'domain' varchar(1023) NOT NULL, 'enabled' bool, 'selfsigned' bool, 'oldstyleSSL' bool, 'airdrop' bool, 'rosterVersion' varchar(50) DEFAULT 0, 'state' blob);" andArguments:nil];
