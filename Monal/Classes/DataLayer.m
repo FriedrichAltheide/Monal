@@ -2759,7 +2759,7 @@ NSString *const kCount = @"count";
         DDLogVerbose(@"Database version <4.6 detected. Performing upgrade on accounts.");
         [self executeNonQuery:@"alter table buddylist add column messageDraft text;" andArguments:nil];
         [self executeNonQuery:@"update dbversion set dbversion='4.6';" andArguments:nil];
-        DDLogVerbose(@"Upgrade to 4.6 success ");
+        DDLogVerbose(@"Upgrade to 4.6 success");
     }
 
     if([dbversion doubleValue] < 4.7)
@@ -2774,7 +2774,7 @@ NSString *const kCount = @"count";
         [self executeNonQuery:@"DROP TABLE _accountTMP;" andArguments:nil];
         [self executeNonQuery:@"PRAGMA foreign_keys=on;" andArguments:nil];
         [self executeNonQuery:@"update dbversion set dbversion='4.7';" andArguments:nil];
-        DDLogVerbose(@"Upgrade to 4.7 success ");
+        DDLogVerbose(@"Upgrade to 4.7 success");
     }
 
     if([dbversion doubleValue] < 4.71)
@@ -2783,7 +2783,22 @@ NSString *const kCount = @"count";
         // Only reset server to '' when server == domain
         [self executeNonQuery:@"UPDATE account SET server='' where server=domain;" andArguments:nil];
         [self executeNonQuery:@"update dbversion set dbversion='4.71';" andArguments:nil];
-        DDLogVerbose(@"Upgrade to 4.71 success ");
+        DDLogVerbose(@"Upgrade to 4.71 success");
+    }
+    
+    if([dbversion doubleValue] < 4.72)
+    {
+        DDLogVerbose(@"Database version <4.72 detected. Performing upgrade on accounts.");
+        // Delete column protocol_id from account and drop protocol table
+        [self executeNonQuery:@"PRAGMA foreign_keys=off;" andArguments:nil];
+        [self executeNonQuery:@"ALTER TABLE account RENAME TO _accountTMP;" andArguments:nil];
+        [self executeNonQuery:@"CREATE TABLE 'account' ('account_id' integer NOT NULL PRIMARY KEY AUTOINCREMENT, 'server' varchar(1023) NOT NULL, 'other_port' integer, 'username' varchar(1023) NOT NULL, 'secure' bool, 'resource'  varchar(1023) NOT NULL, 'domain' varchar(1023) NOT NULL, 'enabled' bool, 'selfsigned' bool, 'oldstyleSSL' bool, 'airdrop' bool, 'rosterVersion' varchar(50) DEFAULT 0, 'state' blob);" andArguments:nil];
+        [self executeNonQuery:@"INSERT INTO account (account_id, server, other_port, username, secure, resource, domain, enabled, selfsigned, oldstyleSSL, airdrop, rosterVersion, state) SELECT account_id, server, other_port, username, secure, resource, domain, enabled, selfsigned, oldstyleSSL, airdrop, rosterVersion, state from _accountTMP;" andArguments:nil];
+        [self executeNonQuery:@"DROP TABLE _accountTMP;" andArguments:nil];
+        [self executeNonQuery:@"PRAGMA foreign_keys=on;" andArguments:nil];
+        [self executeNonQuery:@"DROP TABLE protocol;" andArguments:nil];
+        [self executeNonQuery:@"update dbversion set dbversion='4.72';" andArguments:nil];
+        DDLogVerbose(@"Upgrade to 4.72 success");
     }
     
     if([dbversion doubleValue] < 4.72)
