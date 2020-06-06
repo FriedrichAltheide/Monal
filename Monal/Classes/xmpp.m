@@ -42,7 +42,7 @@
 NSString *const kMessageId=@"MessageID";
 NSString *const kSendTimer=@"SendTimer";
 
-NSString *const kStanzaID=@"stanzaID";
+NSString *const kQueueID=@"queueID";
 NSString *const kStanza=@"stanza";
 
 
@@ -115,8 +115,8 @@ NSString *const kXMPPPresence = @"presence";
 @property (nonatomic, strong) NSNumber *lastOutboundStanza;
 
 /**
- Array of NSdic with stanzas that have not been acked.
- NSDic {stanzaID, stanza}
+ Array of NSDictionary with stanzas that have not been acked.
+ NSDictionary {queueID, stanza}
  */
 @property (nonatomic, strong) NSMutableArray *unAckedStanzas;
 
@@ -139,9 +139,6 @@ NSString *const kXMPPPresence = @"presence";
 @property (nonatomic, strong) NSOperationQueue *receiveQueue;
 
 @property (nonatomic, strong) NSOperationQueue *sendQueue;
-
-@property (nonatomic, strong) NSData *containerPrefix;
-@property (nonatomic, strong) NSData *containerSuffix;
 
 @end
 
@@ -176,7 +173,6 @@ NSString *const kXMPPPresence = @"presence";
 
     _versionHash=[self getVersionString];
 
-
     self.priority=[[[NSUserDefaults standardUserDefaults] stringForKey:@"XMPPPriority"] integerValue];
     self.statusMessage=[[NSUserDefaults standardUserDefaults] stringForKey:@"StatusMessage"];
     self.awayState=[[NSUserDefaults standardUserDefaults] boolForKey:@"Away"];
@@ -189,13 +185,6 @@ NSString *const kXMPPPresence = @"presence";
     }
 
     self.xmppCompletionHandlers = [[NSMutableDictionary alloc] init];
-
-
-    NSString *prefixString =@"<container>";
-    NSString *suffixString =@"</container>";
-    self.containerPrefix = [[prefixString dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
-    self.containerSuffix = [[suffixString dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
-
 }
 
 
@@ -337,6 +326,7 @@ NSString *const kXMPPPresence = @"presence";
             [self.connectionProperties.server updateConnectServer: self.connectionProperties.identity.domain];
             [self.connectionProperties.server updateConnectPort: @5222];
             [self.connectionProperties.server updateConnectTLS: NO];
+            DDLogInfo(@"NO SRV records found, using standard xmpp config: %@:%@ (using starttls)", self.connectionProperties.server.connectServer, self.connectionProperties.server.connectPort);
         }
     }
 
@@ -785,7 +775,7 @@ NSString *const kXMPPPresence = @"presence";
         DDLogInfo(@"parse ended");
     });
 
-    MLXMLNode* xmlOpening = [[MLXMLNode alloc] initWithElement:@"xml"];
+    MLXMLNode* xmlOpening = [[MLXMLNode alloc] initWithElement:@"__xml"];
     [self send:xmlOpening];
     MLXMLNode* stream = [[MLXMLNode alloc] init];
     stream.element=@"stream:stream";
@@ -915,7 +905,7 @@ NSString *const kXMPPPresence = @"presence";
         return;
     }
 
-    MLXMLNode* ping =[[MLXMLNode alloc] initWithElement:@"whitePing"]; // no such element. Node has logic to  print white space
+    MLXMLNode* ping =[[MLXMLNode alloc] initWithElement:@"__whitePing"]; // no such element. Node has logic to  print white space
     [self send:ping];
 }
 
@@ -967,8 +957,8 @@ NSString *const kXMPPPresence = @"presence";
 		NSMutableArray *discard =[[NSMutableArray alloc] initWithCapacity:[self.unAckedStanzas count]];
 		for(NSDictionary *dic in iterationArray)
 		{
-			NSNumber *stanzaNumber = [dic objectForKey:kStanzaID];
-			//having a h value of 1 means the first stanza was acked and the first stanza has a kStanzaID of 0
+			NSNumber *stanzaNumber = [dic objectForKey:kQueueID];
+			//having a h value of 1 means the first stanza was acked and the first stanza has a kQueueID of 0
 			if([stanzaNumber integerValue]<[hvalue integerValue])
 				[discard addObject:dic];
 		}
@@ -1040,10 +1030,6 @@ NSString *const kXMPPPresence = @"presence";
 
 -(void) processInput:(XMPPParser *) parsedStanza
 {
-    //prevent reconnect attempt
-    if(_accountState<kStateHasStream)
-        _accountState=kStateHasStream;
-
     DDLogDebug(@"RECV Stanza: <%@> with namespace '%@'", parsedStanza.stanzaType, parsedStanza.stanzaNameSpace);
 
     if([parsedStanza.stanzaType isEqualToString:@"iq"] && [parsedStanza isKindOfClass:[ParseIq class]])
@@ -1371,6 +1357,10 @@ NSString *const kXMPPPresence = @"presence";
     {
         ParseStream* streamNode= parsedStanza;
 
+        //prevent reconnect attempt
+        if(_accountState<kStateHasStream)
+            _accountState=kStateHasStream;
+        
         //perform logic to handle stream
         if(self.accountState<kStateLoggedIn )
         {
@@ -1775,7 +1765,7 @@ static NSMutableArray *extracted(xmpp *object) {
             || [stanza.element isEqualToString:@"presence"])
         {
             DDLogVerbose(@"ADD UNACKED STANZA: %@: %@", self.lastOutboundStanza, stanza.XMLString);
-            NSDictionary *dic =@{kStanzaID:self.lastOutboundStanza, kStanza:stanza};
+            NSDictionary *dic =@{kQueueID:self.lastOutboundStanza, kStanza:stanza};
             [self.unAckedStanzas addObject:dic];
             //increment for next call
             self.lastOutboundStanza=[NSNumber numberWithInteger:[self.lastOutboundStanza integerValue]+1];
@@ -2067,7 +2057,7 @@ static NSMutableArray *extracted(xmpp *object) {
                      );
         if(self.unAckedStanzas)
             for(NSDictionary *dic in self.unAckedStanzas)
-                DDLogDebug(@"readState unAckedStanza %@: %@", [dic objectForKey:kStanzaID], ((MLXMLNode*)[dic objectForKey:kStanza]).XMLString);
+                DDLogDebug(@"readState unAckedStanza %@: %@", [dic objectForKey:kQueueID], ((MLXMLNode*)[dic objectForKey:kStanza]).XMLString);
     }
 }
 
@@ -2356,7 +2346,7 @@ static NSMutableArray *extracted(xmpp *object) {
     [query setiqTo:jid];
     [query requestDevices];
     if([jid isEqualToString:self.connectionProperties.identity.jid]) {
-        self.deviceQueryId=query.stanzaID;
+        self.deviceQueryId=[query.attributes objectForKey:@"id"];
     }
 
     [self send:query];
@@ -2885,7 +2875,7 @@ static NSMutableArray *extracted(xmpp *object) {
     [iq setiqTo:self.connectionProperties.identity.domain];
     [iq changePasswordForUser:self.connectionProperties.identity.user newPassword:newPass];
     if(completion) {
-        [self.xmppCompletionHandlers setObject:completion forKey:iq.stanzaID];
+        [self.xmppCompletionHandlers setObject:completion forKey:[iq.attributes objectForKey:@"id"]];
     }
     [self send:iq];
 }
