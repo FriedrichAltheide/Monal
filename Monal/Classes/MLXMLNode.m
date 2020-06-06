@@ -49,6 +49,14 @@
     [encoder encodeObject:_data forKey:@"data"];
 }
 
+-(id) copyWithZone:(NSZone*)zone {
+    MLXMLNode* copy = [[[self class] alloc] initWithElement:self.element];
+    copy.attributes = [_attributes mutableCopy];
+    copy.children = [_children mutableCopy];
+    copy.data = _data;
+    return copy;
+}
+
 -(void) setXMLNS:(NSString*) xmlns
 {
     [self.attributes setObject:xmlns forKey:kXMLNS];

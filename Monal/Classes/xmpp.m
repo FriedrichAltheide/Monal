@@ -1764,8 +1764,13 @@ static NSMutableArray *extracted(xmpp *object) {
             || [stanza.element isEqualToString:@"message"]
             || [stanza.element isEqualToString:@"presence"])
         {
-            DDLogVerbose(@"ADD UNACKED STANZA: %@: %@", self.lastOutboundStanza, stanza.XMLString);
-            NSDictionary *dic =@{kQueueID:self.lastOutboundStanza, kStanza:stanza};
+            MLXMLNode* queued_stanza = [stanza copy];
+            if(![queued_stanza.element isEqualToString:@"iq"])
+            {
+                //TODO: add delay tag
+            }
+            DDLogVerbose(@"ADD UNACKED STANZA: %@: %@", self.lastOutboundStanza, queued_stanza.XMLString);
+            NSDictionary *dic =@{kQueueID:self.lastOutboundStanza, kStanza:queued_stanza};
             [self.unAckedStanzas addObject:dic];
             //increment for next call
             self.lastOutboundStanza=[NSNumber numberWithInteger:[self.lastOutboundStanza integerValue]+1];
