@@ -391,12 +391,6 @@ NSString *const kXMPPPresence = @"presence";
     [self createStreams];
 }
 
--(void) connectWithCompletion:(xmppCompletion) completion
-{
-    [self connect];
-    if(completion) self.loginCompletion = completion;
-}
-
 -(void) connect
 {
     if(self.airDrop){
@@ -864,7 +858,7 @@ NSString *const kXMPPPresence = @"presence";
 -(void) sendPing
 {
     DDLogVerbose(@"sendPing called");
-    if(self.accountState<kStateReconnecting  && !self->_reconnectScheduled)
+    if(self.accountState<kStateReconnecting && !self->_reconnectScheduled)
     {
         DDLogInfo(@" ping calling reconnect");
         self->_accountState=kStateReconnecting;
@@ -897,10 +891,11 @@ NSString *const kXMPPPresence = @"presence";
         }
         else  {
             if(self.connectionProperties.supportsPing) {
-                XMPPIQ* ping =[[XMPPIQ alloc] initWithType:kiqGetType];
+                XMPPIQ* ping = [[XMPPIQ alloc] initWithType:kiqGetType];
                 [ping setiqTo:self.connectionProperties.identity.domain];
                 [ping setPing];
                 [self send:ping];
+                [self setPingTimerForID:[ping.attributes objectForKey:@"id"]];
             } else  {
                 [self sendWhiteSpacePing];
             }
@@ -952,8 +947,8 @@ NSString *const kXMPPPresence = @"presence";
         //clear queue because we don't want to repeat resending these stanzas later if the var stanzas points to self.unAckedStanzas here
         [stanzas removeAllObjects];
         [sendCopy enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-            NSDictionary *dic= (NSDictionary *) obj;
-            MLXMLNode *stanza=[dic objectForKey:kStanza];
+            NSDictionary* dic = (NSDictionary *) obj;
+            MLXMLNode* stanza = [dic objectForKey:kStanza];
             if([stanza.element isEqualToString:@"message"])		//only resend message stanzas because of the smacks error condition
                 [self send:stanza];
         }];
@@ -967,27 +962,41 @@ NSString *const kXMPPPresence = @"presence";
 {
     if(hvalue==nil)
         return;
+    
     self.lastHandledOutboundStanza=hvalue;
-	if([self.unAckedStanzas count]>0)
-	{
-		NSMutableArray *iterationArray = [[NSMutableArray alloc] initWithArray:self.unAckedStanzas];
-		DDLogDebug(@"removeAckedStanzasFromQueue: hvalue %@, lastOutboundStanza %@", hvalue, self.lastOutboundStanza);
-		NSMutableArray *discard =[[NSMutableArray alloc] initWithCapacity:[self.unAckedStanzas count]];
-		for(NSDictionary *dic in iterationArray)
-		{
-			NSNumber *stanzaNumber = [dic objectForKey:kQueueID];
-			//having a h value of 1 means the first stanza was acked and the first stanza has a kQueueID of 0
-			if([stanzaNumber integerValue]<[hvalue integerValue])
-				[discard addObject:dic];
-		}
+    
+    if([self.unAckedStanzas count]>0)
+    {
+        NSMutableArray* iterationArray = [[NSMutableArray alloc] initWithArray:self.unAckedStanzas];
+        DDLogDebug(@"removeAckedStanzasFromQueue: hvalue %@, lastOutboundStanza %@", hvalue, self.lastOutboundStanza);
+        NSMutableArray* discard =[[NSMutableArray alloc] initWithCapacity:[self.unAckedStanzas count]];
+        for(NSDictionary* dic in iterationArray)
+        {
+            NSNumber* stanzaNumber = [dic objectForKey:kQueueID];
+            MLXMLNode* node = [dic objectForKey:kStanza];
+            //having a h value of 1 means the first stanza was acked and the first stanza has a kQueueID of 0
+            if([stanzaNumber integerValue]<[hvalue integerValue])
+            {
+                [discard addObject:dic];
+                
+                //signal successful delivery to the server to all notification listeners
+                //(NOT the successful delivery to the receiving client, see the implementation of XEP-0184 for that)
+                if([node isKindOfClass:[XMPPMessage class]])
+                {
+                    XMPPMessage* messageNode = (XMPPMessage*)node;
+                    NSDictionary* dic = @{kMessageId:messageNode.xmppId};
+                    [[NSNotificationCenter defaultCenter] postNotificationName:kMonalSentMessageNotice object:self userInfo:dic];
+                }
+            }
+        }
 
-		[iterationArray removeObjectsInArray:discard];
-		self.unAckedStanzas = iterationArray;
+        [iterationArray removeObjectsInArray:discard];
+        self.unAckedStanzas = iterationArray;
 
-		//persist these changes (but only if we actually made some changes)
-		if([discard count])
-			[self persistState];
-	}
+        //persist these changes (but only if we actually made some changes)
+        if([discard count])
+            [self persistState];
+    }
 }
 
 -(void) requestSMAck:(BOOL) force
@@ -3161,54 +3170,34 @@ static NSMutableArray *extracted(xmpp *object) {
         BOOL success=[self writeToStream:node.XMLString];
         if(success)
         {
-			//only react to stanzas, not nonzas
-			if([node.element isEqualToString:@"iq"]
-				|| [node.element isEqualToString:@"message"]
-				|| [node.element isEqualToString:@"presence"]) {
-				requestAck=YES;
-			}
+            //only react to stanzas, not nonzas
+            if([node.element isEqualToString:@"iq"]
+                || [node.element isEqualToString:@"message"]
+                || [node.element isEqualToString:@"presence"]) {
+                requestAck=YES;
+            }
 
-			if([node isKindOfClass:[XMPPMessage class]])
-			{
-				XMPPMessage *messageNode = (XMPPMessage *) node;
-				NSDictionary *dic =@{kMessageId:messageNode.xmppId};
-				[[NSNotificationCenter defaultCenter] postNotificationName: kMonalSentMessageNotice object:self userInfo:dic];
-
-			}
-			else if([node isKindOfClass:[XMPPIQ class]])
-			{
-				XMPPIQ *iq = (XMPPIQ *)node;
-				if([iq.children count]>0)
-				{
-					MLXMLNode *child =[iq.children objectAtIndex:0];
-					if ([[child element] isEqualToString:@"ping"])
-					{
-						[self setPingTimerForID:[iq.attributes objectForKey:@"id"]];
-					}
-				}
-			}
-
-			DDLogVerbose(@"removing sent MLXMLNode from _outputQueue");
-			[_outputQueue removeObject:node];
-		}
-		else		//stop sending the remainder of the queue if the send failed (tcp output buffer full etc.)
+            DDLogVerbose(@"removing sent MLXMLNode from _outputQueue");
+            [_outputQueue removeObject:node];
+        }
+        else		//stop sending the remainder of the queue if the send failed (tcp output buffer full etc.)
         {
-			DDLogInfo(@"could not send whole _outputQueue: tcp buffer full or connection has an error");
-			break;
-		}
+            DDLogInfo(@"could not send whole _outputQueue: tcp buffer full or connection has an error");
+            break;
+        }
     }
 
     if(requestAck)
     {
-		//adding the smacks request to the receiveQueue will make sure that we send the request
-		//*after* processing an incoming burst of stanzas (which is potentially causing an outgoing burst of stanzas)
-		//this reduces the requests to an absolute minimum while still maintaining the rule to request an ack
-		//for every stanza (e.g. until the smacks queue is empty) and not sending an ack if one is already in flight
-		DDLogVerbose(@"adding smacks request to receiveQueue...");
-		[self.receiveQueue addOperationWithBlock: ^{
-			DDLogVerbose(@"calling requestSMAck from receiveQueue...");
-			[self requestSMAck:NO];
-		}];
+        //adding the smacks request to the receiveQueue will make sure that we send the request
+        //*after* processing an incoming burst of stanzas (which is potentially causing an outgoing burst of stanzas)
+        //this reduces the requests to an absolute minimum while still maintaining the rule to request an ack
+        //for every stanza (e.g. until the smacks queue is empty) and not sending an ack if one is already in flight
+        DDLogVerbose(@"adding smacks request to receiveQueue...");
+        [self.receiveQueue addOperationWithBlock: ^{
+            DDLogVerbose(@"calling requestSMAck from receiveQueue...");
+            [self requestSMAck:NO];
+        }];
 
     } else  {
         DDLogVerbose(@"NOT adding smacks request to receiveQueue...");
