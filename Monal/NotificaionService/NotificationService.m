@@ -18,7 +18,7 @@
 @implementation NotificationService
 
 - (void)didReceiveNotificationRequest:(UNNotificationRequest *)request withContentHandler:(void (^)(UNNotificationContent * _Nonnull))contentHandler {
-    DDLogInfo(@"notification handler called");
+    //***DDLogInfo(@"notification handler called");
     self.contentHandler = contentHandler;
     self.bestAttemptContent = [request.content mutableCopy];
     
@@ -30,7 +30,7 @@
 }
 
 - (void)serviceExtensionTimeWillExpire {
-    DDLogInfo(@"notification handler expired");
+    //***DDLogInfo(@"notification handler expired");
     // Called just before the extension will be terminated by the system.
     // Use this as an opportunity to deliver your "best attempt" at modified content, otherwise the original push payload will be used.
     self.contentHandler(self.bestAttemptContent);
