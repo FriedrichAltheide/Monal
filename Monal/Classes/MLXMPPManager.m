@@ -272,18 +272,21 @@ An array of Dics what have timers to make sure everything was sent
         if([self allAccountsIdle] && [self isInBackground])
         {
             DDLogInfo(@"### All accounts idle, stopping all background tasks ###");
+            BOOL stopped = NO;
             if(_bgTask != UIBackgroundTaskInvalid)
             {
                 DDLogVerbose(@"stopping UIKit _bgTask");
                 [[UIApplication sharedApplication] endBackgroundTask:_bgTask];
                 _bgTask = UIBackgroundTaskInvalid;
+                stopped = YES;
             }
-            else if(_bgFetch)
+            if(_bgFetch)
             {
                 DDLogVerbose(@"stopping backgroundFetchingTask");
                 [_bgFetch setTaskCompletedWithSuccess:YES];
+                stopped = YES;
             }
-            else
+            if(!stopped)
                 DDLogVerbose(@"no background tasks running, nothing to stop");
             
             /*
@@ -308,6 +311,12 @@ An array of Dics what have timers to make sure everything was sent
         [task setTaskCompletedWithSuccess:NO];
         [self scheduleBackgroundFetchingTask];      //schedule new one if neccessary
     };
+    unsigned long tick = 0;
+    while(1)
+    {
+        DDLogVerbose(@"BGTASK TICK: %ul", tick++);
+        [NSThread sleepForTimeInterval:1.000];
+    }
 }
 
 -(void) configureBackgroundFetchingTask
