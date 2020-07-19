@@ -23,8 +23,8 @@
     self.bestAttemptContent = [request.content mutableCopy];
     
     // Modify the notification content here...
-    self.bestAttemptContent.title = @"New Message"; //[NSString stringWithFormat:@"New Message %@", self.bestAttemptContent.title];
-    self.bestAttemptContent.body = @"Open app to view";
+    self.bestAttemptContent.title = @"THIS New Message"; //[NSString stringWithFormat:@"New Message %@", self.bestAttemptContent.title];
+    self.bestAttemptContent.body = @"Open THIS app to view";
     self.bestAttemptContent.badge = @1;
     //self.contentHandler(self.bestAttemptContent);
 }
