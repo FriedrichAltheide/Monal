@@ -26,7 +26,7 @@
     self.bestAttemptContent.title = @"THIS New Message"; //[NSString stringWithFormat:@"New Message %@", self.bestAttemptContent.title];
     self.bestAttemptContent.body = @"Open THIS app to view";
     self.bestAttemptContent.badge = @1;
-    //self.contentHandler(self.bestAttemptContent);
+    self.contentHandler(self.bestAttemptContent);
 }
 
 - (void)serviceExtensionTimeWillExpire {
